@@ -6,6 +6,8 @@ import aiohttp
 import io
 import base64
 import re
+from flask import Flask
+from threading import Thread
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -527,8 +529,27 @@ async def on_command_error(ctx, error):
         await ctx.send(f"❌ An error occurred: {str(error)}")
 
 
+# Create Flask app for UptimeRobot health check
+app = Flask(__name__)
+
+@app.route('/')
+@app.route('/health')
+@app.route('/uptime')
+def health_check():
+    """Health check endpoint for UptimeRobot"""
+    return "ok", 200
+
+def run_flask():
+    """Run Flask server in a separate thread"""
+    app.run(host='0.0.0.0', port=8080, debug=False)
+
 # Run the bot
 if __name__ == '__main__':
+    # Start Flask server in a separate thread
+    flask_thread = Thread(target=run_flask, daemon=True)
+    flask_thread.start()
+    print("✅ Health check server started on http://0.0.0.0:8080")
+    
     token = os.getenv('DISCORD_BOT_TOKEN')
     if not token:
         print("❌ ERROR: DISCORD_BOT_TOKEN not found in environment variables!")
