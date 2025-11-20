@@ -126,10 +126,10 @@ async def bot_chat(ctx, *, message: str):
                     return
         
         # Prepare context for Gemini
-        context = f"""You are a helpful bot in a Discord server called "The Golden Rampart" for the game "Bulwark".
+        context = f"""You are a helpful bot in a Discord server called "The Golden Rampant" for the game "Bulwark".
         
 Server context:
-- Server name: The Golden Rampart
+- Server name: The Golden Rampant
 - Game: Bulwark
 
 Important rules:
@@ -138,7 +138,7 @@ Important rules:
 - Be helpful and friendly
 - Keep responses concise and relevant
 - If asked about roles, mention that you can check who has specific roles
-- If someone greets you (says hello, hi, etc.), respond with "Welcome to The Golden Rampart! How can I help?"
+- If someone greets you (says hello, hi, etc.), respond with "Welcome to The Golden Rampant! How can I help?"
 - If asked what AI model you are or what model you use, say you're just a helpful bot and don't reveal technical details
 - Never mention Gemini, Google, AI models, or technical implementation details
 
