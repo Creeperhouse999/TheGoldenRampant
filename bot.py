@@ -416,6 +416,52 @@ async def send_message(ctx, channel_name: str, *, message_text: str):
         await ctx.send(f"❌ An error occurred: {str(e)}")
 
 
+@bot.command(name='clear')
+async def clear_chat(ctx):
+    """
+    Manually clears the chat channel.
+    
+    Usage: !clear
+    """
+    try:
+        # Check if command is used in a server (not DM)
+        if ctx.guild is None:
+            await ctx.send("❌ This command can only be used in a server, not in direct messages.")
+            return
+        
+        # Check if user has admin/manage server or manage messages permission
+        if not (ctx.author.guild_permissions.manage_guild or 
+                ctx.author.guild_permissions.administrator or 
+                ctx.author.guild_permissions.manage_messages):
+            await ctx.send("❌ You don't have permission to use this command.")
+            return
+        
+        # Get the target channel ID
+        clear_channel_id = 1440064713584279632
+        clear_channel = bot.get_channel(clear_channel_id)
+        
+        if not clear_channel:
+            await ctx.send("❌ Could not find the target channel.")
+            return
+        
+        # Check if bot has permission to manage messages
+        if not clear_channel.permissions_for(ctx.guild.me).manage_messages:
+            await ctx.send("❌ I don't have permission to clear messages in that channel.")
+            return
+        
+        # Clear the channel (delete all messages, keeping pinned messages)
+        try:
+            deleted = await clear_channel.purge(limit=None, check=lambda m: not m.pinned)
+            await ctx.send(f"✅ Chat cleared! Deleted {len(deleted)} messages.")
+        except discord.Forbidden:
+            await ctx.send("❌ I don't have permission to delete messages in that channel.")
+        except Exception as e:
+            await ctx.send(f"❌ Error clearing chat: {str(e)}")
+            
+    except Exception as e:
+        await ctx.send(f"❌ An error occurred: {str(e)}")
+
+
 @bot.command(name='verify')
 async def verify_user(ctx):
     """
