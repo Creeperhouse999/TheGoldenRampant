@@ -56,6 +56,20 @@ async def on_member_join(member):
         if len(processed_members) > 1000:
             processed_members.clear()
         
+        # Assign guest role to new members
+        guest_role = discord.utils.get(member.guild.roles, name="guest")
+        if not guest_role:
+            guest_role = discord.utils.get(member.guild.roles, name="Guest")
+        
+        if guest_role:
+            try:
+                if member.guild.me.guild_permissions.manage_roles:
+                    if member.guild.me.top_role > guest_role:
+                        if guest_role not in member.roles:
+                            await member.add_roles(guest_role, reason="New member - assigned guest role")
+            except:
+                pass  # Silently fail if can't assign
+        
         # Get the target welcome channel ID
         welcome_channel_id = 1440064713584279632
         welcome_channel = bot.get_channel(welcome_channel_id)
@@ -467,28 +481,52 @@ async def verify_user(ctx):
                 elif 'Rating:' in line:
                     rating = line.split('Rating:')[1].strip()
         
-        # Find and assign peasant role
+        # Find roles
         peasant_role = discord.utils.get(ctx.guild.roles, name="peasant")
         if not peasant_role:
-            # Try case-insensitive search
             peasant_role = discord.utils.get(ctx.guild.roles, name="Peasant")
         if not peasant_role:
-            # Try other variations
             for role in ctx.guild.roles:
                 if role.name.lower() == "peasant":
                     peasant_role = role
                     break
         
-        # Assign the peasant role (silently)
+        member_role = discord.utils.get(ctx.guild.roles, name="member")
+        if not member_role:
+            member_role = discord.utils.get(ctx.guild.roles, name="Member")
+        if not member_role:
+            for role in ctx.guild.roles:
+                if role.name.lower() == "member":
+                    member_role = role
+                    break
+        
+        guest_role = discord.utils.get(ctx.guild.roles, name="guest")
+        if not guest_role:
+            guest_role = discord.utils.get(ctx.guild.roles, name="Guest")
+        if not guest_role:
+            for role in ctx.guild.roles:
+                if role.name.lower() == "guest":
+                    guest_role = role
+                    break
+        
+        # Assign roles after verification
         if peasant_role:
             try:
-                # Check if bot has permission to manage roles
                 if ctx.guild.me.guild_permissions.manage_roles:
-                    # Check if bot's role is higher than the peasant role
+                    # Assign peasant role
                     if ctx.guild.me.top_role > peasant_role:
-                        # Check if user already has the role
                         if peasant_role not in ctx.author.roles:
                             await ctx.author.add_roles(peasant_role, reason="Verified via !verify command")
+                    
+                    # Assign member role if it exists
+                    if member_role and ctx.guild.me.top_role > member_role:
+                        if member_role not in ctx.author.roles:
+                            await ctx.author.add_roles(member_role, reason="Verified via !verify command")
+                    
+                    # Remove guest role if it exists and user has it
+                    if guest_role and ctx.guild.me.top_role > guest_role:
+                        if guest_role in ctx.author.roles:
+                            await ctx.author.remove_roles(guest_role, reason="Verified - guest role removed")
             except discord.Forbidden:
                 pass  # Silently fail if no permission
             except Exception as e:
