@@ -56,25 +56,12 @@ async def on_member_join(member):
         if len(processed_members) > 1000:
             processed_members.clear()
         
-        # Find a channel to send the welcome message
-        # Try to find a welcome channel first, then general, then any text channel
-        welcome_channel = None
-        
-        # Try to find channels named "welcome" or "general"
-        for channel in member.guild.text_channels:
-            if channel.name.lower() in ['welcome', 'general', 'chat']:
-                welcome_channel = channel
-                break
-        
-        # If no specific channel found, use the first text channel the bot can send messages to
-        if not welcome_channel:
-            for channel in member.guild.text_channels:
-                if channel.permissions_for(member.guild.me).send_messages:
-                    welcome_channel = channel
-                    break
+        # Get the target welcome channel ID
+        welcome_channel_id = 1440064713584279632
+        welcome_channel = bot.get_channel(welcome_channel_id)
         
         if welcome_channel:
-            welcome_message = f"Welcome, {member.mention}! {member.mention} joined the server."
+            welcome_message = f"Welcome, {member.mention}!"
             await welcome_channel.send(welcome_message)
     except Exception as e:
         # Silently fail if welcome message can't be sent
