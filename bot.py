@@ -437,6 +437,10 @@ Respond naturally and helpfully, but keep it short and appropriate."""
         except Exception as e:
             await ctx.send(f"Error: {str(e)}")
             return  # Explicit return to prevent any duplicate sending
+            
+    except Exception as e:
+        # Prevent propagation to on_command_error to avoid duplicate messages
+        pass
 
 
 @bot.command(name='sendmessage')
