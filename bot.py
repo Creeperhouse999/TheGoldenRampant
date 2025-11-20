@@ -37,9 +37,8 @@ processed_members = set()
 
 # Chat clear scheduling
 chat_clear_enabled = True  # Set to False when !notclear is used
-target_channel_id = 1440064713584279632  # Channel to clear
-warning_channel_id = 1440439226029314190  # Channel for warnings
-warnings_sent = {'3days': False, '1day': False}  # Track sent warnings
+target_channel_id = 1440064713584279632  # Channel to clear and send warnings
+warnings_sent = {'3days': False, '1day': False, '1hour': False, '1minute': False}  # Track sent warnings
 
 
 @bot.event
@@ -50,7 +49,7 @@ async def on_ready():
         check_chat_clear.start()
 
 
-@tasks.loop(hours=1)  # Check every hour
+@tasks.loop(minutes=1)  # Check every minute for accurate 1-minute warnings
 async def check_chat_clear():
     """Check if chat clear warnings or actual clear needs to happen"""
     global chat_clear_enabled, warnings_sent
@@ -67,41 +66,67 @@ async def check_chat_clear():
         days_until = (next_month - now).days
         hours_until = (next_month - now).total_seconds() / 3600
         
+        # Get the target channel for warnings and clearing
+        target_channel = bot.get_channel(target_channel_id)
+        
+        if not target_channel:
+            return  # Can't proceed without channel
+        
         # Check if it's time to clear (1st of month, midnight)
         if now.day == 1 and now.hour == 0 and now.minute < 5:  # Check within first 5 minutes
             if chat_clear_enabled:
-                clear_channel = bot.get_channel(target_channel_id)
-                if clear_channel:
-                    try:
-                        # Delete all messages
-                        deleted = await clear_channel.purge(limit=None, check=lambda m: not m.pinned)
-                        await clear_channel.send(f"Chat cleared! Deleted {len(deleted)} messages.")
-                    except discord.Forbidden:
-                        print("No permission to clear chat")
-                    except Exception as e:
-                        print(f"Error clearing chat: {e}")
+                try:
+                    # Delete all messages
+                    deleted = await target_channel.purge(limit=None, check=lambda m: not m.pinned)
+                    await target_channel.send(f"Chat cleared! Deleted {len(deleted)} messages.")
+                except discord.Forbidden:
+                    print("No permission to clear chat")
+                except Exception as e:
+                    print(f"Error clearing chat: {e}")
             
             # Reset for next month
             chat_clear_enabled = True
-            warnings_sent = {'3days': False, '1day': False}
+            warnings_sent = {'3days': False, '1day': False, '1hour': False, '1minute': False}
         
         # Check for warning dates (only if clear is enabled)
         elif chat_clear_enabled:
-            warning_channel = bot.get_channel(warning_channel_id)
-            if warning_channel:
-                # 3 days before (approximately 72 hours)
-                if 2.5 <= days_until <= 3.5 and not warnings_sent['3days']:
-                    await warning_channel.send(f"⚠️ Chat clear scheduled: 3 days remaining. Channel will be cleared on {next_month.strftime('%B 1st, %Y')}.")
+            # 3 days before (approximately 72 hours)
+            if 2.5 <= days_until <= 3.5 and not warnings_sent['3days']:
+                try:
+                    await target_channel.send(f"⚠️ Chat clear scheduled: 3 days remaining. Channel will be cleared on {next_month.strftime('%B 1st, %Y at %I:%M %p')}.")
                     warnings_sent['3days'] = True
-                
-                # 1 day before (approximately 24 hours)
-                elif 0.5 <= days_until <= 1.5 and not warnings_sent['1day']:
-                    await warning_channel.send(f"⚠️ Chat clear scheduled: 1 day remaining. Channel will be cleared on {next_month.strftime('%B 1st, %Y')}.")
+                except:
+                    pass
+            
+            # 1 day before (approximately 24 hours)
+            elif 0.5 <= days_until <= 1.5 and not warnings_sent['1day']:
+                try:
+                    await target_channel.send(f"⚠️ Chat clear scheduled: 1 day remaining. Channel will be cleared on {next_month.strftime('%B 1st, %Y at %I:%M %p')}.")
                     warnings_sent['1day'] = True
-                
-                # Reset warnings if more than 4 days away (new month cycle)
-                if days_until > 4:
-                    warnings_sent = {'3days': False, '1day': False}
+                except:
+                    pass
+            
+            # 1 hour before (approximately 60 minutes)
+            elif 58 <= hours_until <= 62 and not warnings_sent['1hour']:
+                try:
+                    await target_channel.send(f"⚠️ Chat clear scheduled: 1 hour remaining. Channel will be cleared on {next_month.strftime('%B 1st, %Y at %I:%M %p')}.")
+                    warnings_sent['1hour'] = True
+                except:
+                    pass
+            
+            # 1 minute before (approximately 60 seconds)
+            elif 0.8 <= hours_until <= 1.2 and not warnings_sent['1minute']:
+                minutes_until = hours_until * 60
+                if 58 <= minutes_until <= 62:
+                    try:
+                        await target_channel.send(f"⚠️ Chat clear scheduled: 1 minute remaining. Channel will be cleared on {next_month.strftime('%B 1st, %Y at %I:%M %p')}.")
+                        warnings_sent['1minute'] = True
+                    except:
+                        pass
+            
+            # Reset warnings if more than 4 days away (new month cycle)
+            if days_until > 4:
+                warnings_sent = {'3days': False, '1day': False, '1hour': False, '1minute': False}
     
     except Exception as e:
         print(f"Error in check_chat_clear: {e}")
@@ -128,7 +153,7 @@ async def cancel_chat_clear(ctx):
             return
         
         chat_clear_enabled = False
-        warnings_sent = {'3days': True, '1day': True}  # Mark as sent to prevent sending more
+        warnings_sent = {'3days': True, '1day': True, '1hour': True, '1minute': True}  # Mark as sent to prevent sending more
         
         # Calculate next 1st of month for confirmation
         now = datetime.now()
@@ -138,6 +163,42 @@ async def cancel_chat_clear(ctx):
             next_month = datetime(now.year, now.month + 1, 1)
         
         await ctx.send(f"✅ Chat clear cancelled. The scheduled clear on {next_month.strftime('%B 1st, %Y')} has been cancelled.")
+    
+    except Exception as e:
+        await ctx.send(f"❌ An error occurred: {str(e)}")
+
+
+@bot.command(name='yesclear')
+async def enable_chat_clear(ctx):
+    """
+    Re-enables the chat clear if it was cancelled with !notclear.
+    
+    Usage: !yesclear
+    """
+    global chat_clear_enabled, warnings_sent
+    
+    try:
+        # Check if command is used in a server (not DM)
+        if ctx.guild is None:
+            await ctx.send("❌ This command can only be used in a server, not in direct messages.")
+            return
+        
+        # Check if user has admin/manage server permissions
+        if not ctx.author.guild_permissions.manage_guild and not ctx.author.guild_permissions.administrator:
+            await ctx.send("❌ You don't have permission to use this command.")
+            return
+        
+        chat_clear_enabled = True
+        warnings_sent = {'3days': False, '1day': False, '1hour': False, '1minute': False}  # Reset warnings
+        
+        # Calculate next 1st of month for confirmation
+        now = datetime.now()
+        if now.month == 12:
+            next_month = datetime(now.year + 1, 1, 1)
+        else:
+            next_month = datetime(now.year, now.month + 1, 1)
+        
+        await ctx.send(f"✅ Chat clear **RE-ENABLED**. The scheduled clear on {next_month.strftime('%B 1st, %Y')} is now active.")
     
     except Exception as e:
         await ctx.send(f"❌ An error occurred: {str(e)}")
@@ -457,6 +518,42 @@ async def clear_chat(ctx):
             await ctx.send("❌ I don't have permission to delete messages in that channel.")
         except Exception as e:
             await ctx.send(f"❌ Error clearing chat: {str(e)}")
+            
+    except Exception as e:
+        await ctx.send(f"❌ An error occurred: {str(e)}")
+
+
+@bot.command(name='nextclear')
+async def next_clear_info(ctx):
+    """
+    Shows when the next chat clear is scheduled.
+    
+    Usage: !nextclear
+    """
+    try:
+        # Check if command is used in a server (not DM)
+        if ctx.guild is None:
+            await ctx.send("❌ This command can only be used in a server, not in direct messages.")
+            return
+        
+        global chat_clear_enabled
+        
+        # Calculate next 1st of month
+        now = datetime.now()
+        if now.month == 12:
+            next_month = datetime(now.year + 1, 1, 1, 0, 0, 0)
+        else:
+            next_month = datetime(now.year, now.month + 1, 1, 0, 0, 0)
+        
+        days_until = (next_month - now).days
+        hours_until = (next_month - now).total_seconds() / 3600
+        
+        if chat_clear_enabled:
+            await ctx.send(f"📅 Next chat clear: **{next_month.strftime('%B 1st, %Y at %I:%M %p')}**\n"
+                          f"⏰ Time remaining: {days_until} day(s) ({int(hours_until)} hours)")
+        else:
+            await ctx.send(f"❌ Chat clear is **CANCELLED** for {next_month.strftime('%B 1st, %Y')}.\n"
+                          f"Use `!notclear` again after the scheduled date to resume automatic clears, or use `!clear` to manually clear now.")
             
     except Exception as e:
         await ctx.send(f"❌ An error occurred: {str(e)}")
