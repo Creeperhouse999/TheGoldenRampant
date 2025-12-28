@@ -9,7 +9,11 @@ import re
 from flask import Flask
 from threading import Thread
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
+
+# Poland timezone (handles UTC+1/+2 automatically)
+POLAND_TZ = ZoneInfo("Europe/Warsaw")
 
 # Load environment variables
 load_dotenv()
@@ -55,13 +59,13 @@ async def check_chat_clear():
     global chat_clear_enabled, warnings_sent
     
     try:
-        now = datetime.now()
+        now = datetime.now(POLAND_TZ)
         
-        # Calculate next 1st of month
+        # Calculate next 1st of month at 12:00 PM (noon)
         if now.month == 12:
-            next_month = datetime(now.year + 1, 1, 1, 0, 0, 0)
+            next_month = datetime(now.year + 1, 1, 1, 12, 0, 0, tzinfo=POLAND_TZ)
         else:
-            next_month = datetime(now.year, now.month + 1, 1, 0, 0, 0)
+            next_month = datetime(now.year, now.month + 1, 1, 12, 0, 0, tzinfo=POLAND_TZ)
         
         days_until = (next_month - now).days
         hours_until = (next_month - now).total_seconds() / 3600
@@ -72,8 +76,8 @@ async def check_chat_clear():
         if not target_channel:
             return  # Can't proceed without channel
         
-        # Check if it's time to clear (1st of month, midnight)
-        if now.day == 1 and now.hour == 0 and now.minute < 5:  # Check within first 5 minutes
+        # Check if it's time to clear (1st of month, 12:00 PM / noon)
+        if now.day == 1 and now.hour == 12 and now.minute < 5:  # Check within first 5 minutes
             if chat_clear_enabled:
                 try:
                     # Delete all messages
@@ -156,13 +160,13 @@ async def cancel_chat_clear(ctx):
         warnings_sent = {'3days': True, '1day': True, '1hour': True, '1minute': True}  # Mark as sent to prevent sending more
         
         # Calculate next 1st of month for confirmation
-        now = datetime.now()
+        now = datetime.now(POLAND_TZ)
         if now.month == 12:
-            next_month = datetime(now.year + 1, 1, 1)
+            next_month = datetime(now.year + 1, 1, 1, 12, 0, 0, tzinfo=POLAND_TZ)
         else:
-            next_month = datetime(now.year, now.month + 1, 1)
+            next_month = datetime(now.year, now.month + 1, 1, 12, 0, 0, tzinfo=POLAND_TZ)
         
-        await ctx.send(f"✅ Chat clear cancelled. The scheduled clear on {next_month.strftime('%B 1st, %Y')} has been cancelled.")
+        await ctx.send(f"✅ Chat clear cancelled. The scheduled clear on {next_month.strftime('%B 1st, %Y at %I:%M %p')} has been cancelled.")
     
     except Exception as e:
         # Prevent propagation to on_command_error to avoid duplicate messages
@@ -193,13 +197,13 @@ async def enable_chat_clear(ctx):
         warnings_sent = {'3days': False, '1day': False, '1hour': False, '1minute': False}  # Reset warnings
         
         # Calculate next 1st of month for confirmation
-        now = datetime.now()
+        now = datetime.now(POLAND_TZ)
         if now.month == 12:
-            next_month = datetime(now.year + 1, 1, 1)
+            next_month = datetime(now.year + 1, 1, 1, 12, 0, 0, tzinfo=POLAND_TZ)
         else:
-            next_month = datetime(now.year, now.month + 1, 1)
+            next_month = datetime(now.year, now.month + 1, 1, 12, 0, 0, tzinfo=POLAND_TZ)
         
-        await ctx.send(f"✅ Chat clear **RE-ENABLED**. The scheduled clear on {next_month.strftime('%B 1st, %Y')} is now active.")
+        await ctx.send(f"✅ Chat clear **RE-ENABLED**. The scheduled clear on {next_month.strftime('%B 1st, %Y at %I:%M %p')} is now active.")
     
     except Exception as e:
         # Prevent propagation to on_command_error to avoid duplicate messages
@@ -311,6 +315,8 @@ async def bot_chat(ctx, *, message: str):
 Server context:
 - Server name: The Golden Rampant
 - Game: Bulwark (on Roblox)
+- Server timezone: Europe/Warsaw (UTC+1/+2)
+- Chat clear schedule: The chat is automatically cleared on the 1st of every month at 12:00 PM (noon) in the server timezone (Europe/Warsaw, UTC+1/+2). Users receive warnings 3 days, 1 day, 1 hour, and 1 minute before the clear.
 
 About Bulwark:
 Bulwark is a Roblox game focused on medieval melee combat: swords, axes, halberds, shields and fist-fights. It plays like a skill-based dueling game (similar in feel to Chivalry / Mordhau), where spacing, timing and reading your opponent decide the outcome – not overpowered perks or magic spells.
@@ -596,19 +602,19 @@ async def next_clear_info(ctx):
         
         global chat_clear_enabled
         
-        now = datetime.now()
+        now = datetime.now(POLAND_TZ)
         
-        # Calculate next 1st of month (this month)
+        # Calculate next 1st of month (this month) at 12:00 PM (noon)
         if now.month == 12:
-            next_month = datetime(now.year + 1, 1, 1, 0, 0, 0)
+            next_month = datetime(now.year + 1, 1, 1, 12, 0, 0, tzinfo=POLAND_TZ)
         else:
-            next_month = datetime(now.year, now.month + 1, 1, 0, 0, 0)
+            next_month = datetime(now.year, now.month + 1, 1, 12, 0, 0, tzinfo=POLAND_TZ)
         
         # Calculate the month after that (in case current is cancelled)
         if next_month.month == 12:
-            month_after = datetime(next_month.year + 1, 1, 1, 0, 0, 0)
+            month_after = datetime(next_month.year + 1, 1, 1, 12, 0, 0, tzinfo=POLAND_TZ)
         else:
-            month_after = datetime(next_month.year, next_month.month + 1, 1, 0, 0, 0)
+            month_after = datetime(next_month.year, next_month.month + 1, 1, 12, 0, 0, tzinfo=POLAND_TZ)
         
         if chat_clear_enabled:
             # Clear is enabled, show next clear
@@ -622,7 +628,7 @@ async def next_clear_info(ctx):
             days_until_after = (month_after - now).days
             hours_until_after = (month_after - now).total_seconds() / 3600
             
-            await ctx.send(f"❌ Chat clear is **CANCELLED** for {next_month.strftime('%B 1st, %Y')}.\n\n"
+            await ctx.send(f"❌ Chat clear is **CANCELLED** for {next_month.strftime('%B 1st, %Y at %I:%M %p')}.\n\n"
                           f"📅 Next active chat clear: **{month_after.strftime('%B 1st, %Y at %I:%M %p')}**\n"
                           f"⏰ Time remaining: {days_until_after} day(s) ({int(hours_until_after)} hours)")
             
