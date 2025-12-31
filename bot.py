@@ -44,6 +44,10 @@ chat_clear_enabled = True  # Set to False when !notclear is used
 target_channel_id = 1440064713584279632  # Channel to clear and send warnings
 warnings_sent = {'3days': False, '1day': False, '1hour': False, '1minute': False}  # Track sent warnings
 
+# New Year countdown tracking
+new_year_1min_sent = False  # Track if 1-minute warning was sent
+new_year_countdown_sent = set()  # Track which countdown seconds were sent
+
 
 @bot.event
 async def on_ready():
@@ -51,6 +55,8 @@ async def on_ready():
     # Start the scheduled tasks
     if not check_chat_clear.is_running():
         check_chat_clear.start()
+    if not check_new_year.is_running():
+        check_new_year.start()
 
 
 @tasks.loop(minutes=1)  # Check every minute for accurate 1-minute warnings
@@ -134,6 +140,62 @@ async def check_chat_clear():
     
     except Exception as e:
         print(f"Error in check_chat_clear: {e}")
+
+
+@tasks.loop(seconds=1)  # Check every second for accurate countdown
+async def check_new_year():
+    """Check for New Year countdown and send messages"""
+    global new_year_1min_sent, new_year_countdown_sent
+    
+    try:
+        now = datetime.now(POLAND_TZ)
+        
+        # Get the target channel
+        target_channel = bot.get_channel(target_channel_id)
+        
+        if not target_channel:
+            return  # Can't proceed without channel
+        
+        # Check if it's December 31st
+        if now.month == 12 and now.day == 31:
+            # Calculate time until midnight (January 1st, 00:00:00)
+            next_year = datetime(now.year + 1, 1, 1, 0, 0, 0, tzinfo=POLAND_TZ)
+            time_until = (next_year - now).total_seconds()
+            
+            # 1 minute before (60 seconds)
+            if 59 <= time_until <= 61 and not new_year_1min_sent:
+                try:
+                    await target_channel.send("The New Year starts in 1 minute!")
+                    new_year_1min_sent = True
+                except:
+                    pass
+            
+            # Countdown from 10 seconds (send when we're at that second mark)
+            elif 0 <= time_until <= 10:
+                countdown_second = int(time_until)
+                # Send when we're at the exact second (e.g., between 10.0-10.99 for "10...")
+                if countdown_second <= 10 and countdown_second not in new_year_countdown_sent:
+                    try:
+                        if countdown_second == 0:
+                            await target_channel.send("0! Happy new year, Golden Rampant! Let this be a great year!")
+                        else:
+                            await target_channel.send(f"{countdown_second}...")
+                        new_year_countdown_sent.add(countdown_second)
+                    except:
+                        pass
+            
+            # Reset flags after New Year (January 1st, after 00:00:10)
+            if now.month == 1 and now.day == 1 and now.hour == 0 and now.minute == 0 and now.second > 10:
+                new_year_1min_sent = False
+                new_year_countdown_sent.clear()
+        else:
+            # Reset flags if not December 31st
+            if now.month != 12 or now.day != 31:
+                new_year_1min_sent = False
+                new_year_countdown_sent.clear()
+    
+    except Exception as e:
+        print(f"Error in check_new_year: {e}")
 
 
 @bot.command(name='notclear')
@@ -315,8 +377,8 @@ async def bot_chat(ctx, *, message: str):
 Server context:
 - Server name: The Golden Rampant
 - Game: Bulwark (on Roblox)
-- Server timezone: Europe/Warsaw (UTC+1/+2)
-- Chat clear schedule: The chat is automatically cleared on the 1st of every month at 12:00 PM (noon) in the server timezone (Europe/Warsaw, UTC+1/+2). Users receive warnings 3 days, 1 day, 1 hour, and 1 minute before the clear.
+- Server timezone: Europe (UTC+1/+2)
+- Chat clear schedule: The chat is automatically cleared on the 1st of every month at 12:00 PM (noon) in the server timezone (Europe, UTC+1/+2). Users receive warnings 3 days, 1 day, 1 hour, and 1 minute before the clear.
 
 About Bulwark:
 Bulwark is a Roblox game focused on medieval melee combat: swords, axes, halberds, shields and fist-fights. It plays like a skill-based dueling game (similar in feel to Chivalry / Mordhau), where spacing, timing and reading your opponent decide the outcome – not overpowered perks or magic spells.
